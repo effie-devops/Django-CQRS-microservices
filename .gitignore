@@ -17,6 +17,7 @@ staticfiles/
 .env
 
 # Terraform
+terraform.tfvars
 .terraform/
 *.tfstate
 *.tfstate.*
