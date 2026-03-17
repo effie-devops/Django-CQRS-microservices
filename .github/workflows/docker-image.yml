@@ -62,10 +62,12 @@ jobs:
       matrix:
         include:
           - service: reader-service
-            context: app/reader-service/reader
+            context: app
+            dockerfile: app/reader-service/reader/Dockerfile
             enabled: ${{ needs.detect-changes.outputs.reader }}
           - service: writer-service
-            context: app/writer-service/writer
+            context: app
+            dockerfile: app/writer-service/writer/Dockerfile
             enabled: ${{ needs.detect-changes.outputs.writer }}
     if: needs.detect-changes.outputs.reader == 'true' || needs.detect-changes.outputs.writer == 'true'
     steps:
@@ -94,7 +96,7 @@ jobs:
         run: |
           IMAGE=$ECR_REGISTRY/${{ matrix.service }}
           TAG=${GITHUB_SHA::7}
-          docker build -t $IMAGE:$TAG -t $IMAGE:latest ${{ matrix.context }}
+          docker build -f ${{ matrix.dockerfile }} -t $IMAGE:$TAG -t $IMAGE:latest ${{ matrix.context }}
           docker push $IMAGE:$TAG
           docker push $IMAGE:latest
 
