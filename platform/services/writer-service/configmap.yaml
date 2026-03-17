@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: writer-service-config
+  namespace: default
+data:
+  DJANGO_SETTINGS_MODULE: "writer.settings"
