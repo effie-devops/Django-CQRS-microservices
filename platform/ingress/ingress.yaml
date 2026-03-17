@@ -1,0 +1,40 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-ingress
+  namespace: default
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:377106666111:certificate/3332c559-60d6-4c77-bed8-989ac5a2d203
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/healthcheck-path: /health/
+    alb.ingress.kubernetes.io/group.name: django-api
+spec:
+  ingressClassName: alb
+  rules:
+    - host: apis.effiecancode.buzz
+      http:
+        paths:
+          - path: /reader
+            pathType: Prefix
+            backend:
+              service:
+                name: reader-service
+                port:
+                  number: 80
+          - path: /writer
+            pathType: Prefix
+            backend:
+              service:
+                name: writer-service
+                port:
+                  number: 80
+          - path: /health
+            pathType: Prefix
+            backend:
+              service:
+                name: reader-service
+                port:
+                  number: 80
