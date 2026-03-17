@@ -190,6 +190,12 @@ variable "enable_vpc_flow_logs" {
   default     = true
 }
 
+# github variables
+variable "github_repo" {
+  description = "github repo in format owner/repo"
+  type        = string
+}
+
 # monitoring variables
 variable "alert_email" {
   description = "email for alerts"

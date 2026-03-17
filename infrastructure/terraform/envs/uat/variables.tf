@@ -188,3 +188,9 @@ variable "enable_vpc_flow_logs" {
   type        = bool
   default     = true
 }
+
+# github variables
+variable "github_repo" {
+  description = "github repo in format owner/repo"
+  type        = string
+}

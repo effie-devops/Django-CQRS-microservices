@@ -41,6 +41,9 @@ module "django_infrastructure" {
   eks_node_min_size      = var.eks_node_min_size
   eks_node_max_size      = var.eks_node_max_size
 
+  # GitHub
+  github_repo = var.github_repo
+
   # Route53
   record_name = var.record_name
 

@@ -1,18 +1,104 @@
-name: Docker Image CI
+name: Build and Deploy
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: [main]
+    paths:
+      - "app/reader-service/**"
+      - "app/writer-service/**"
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service to deploy"
+        required: true
+        type: choice
+        options:
+          - reader-service
+          - writer-service
+          - both
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER: django-api-uat-cluster
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
-
-  build:
-
+  detect-changes:
     runs-on: ubuntu-latest
-
+    outputs:
+      reader: ${{ steps.changes.outputs.reader }}
+      writer: ${{ steps.changes.outputs.writer }}
     steps:
-    - uses: actions/checkout@v4
-    - name: Build the Docker image
-      run: docker build . --file Dockerfile --tag my-image-name:$(date +%s)
+      - uses: actions/checkout@v4
+
+      - name: Detect changed services
+        id: changes
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            case "${{ inputs.service }}" in
+              reader-service) echo "reader=true" >> $GITHUB_OUTPUT; echo "writer=false" >> $GITHUB_OUTPUT ;;
+              writer-service) echo "reader=false" >> $GITHUB_OUTPUT; echo "writer=true" >> $GITHUB_OUTPUT ;;
+              both)           echo "reader=true" >> $GITHUB_OUTPUT; echo "writer=true" >> $GITHUB_OUTPUT ;;
+            esac
+          else
+            git diff --name-only HEAD~1 HEAD > changes.txt
+            echo "reader=$(grep -q 'app/reader-service/' changes.txt && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "writer=$(grep -q 'app/writer-service/' changes.txt && echo true || echo false)" >> $GITHUB_OUTPUT
+          fi
+
+  build-and-deploy:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: reader-service
+            context: app/reader-service/reader
+            enabled: ${{ needs.detect-changes.outputs.reader }}
+          - service: writer-service
+            context: app/writer-service/writer
+            enabled: ${{ needs.detect-changes.outputs.writer }}
+    if: needs.detect-changes.outputs.reader == 'true' || needs.detect-changes.outputs.writer == 'true'
+    steps:
+      - name: Skip if not changed
+        if: matrix.enabled != 'true'
+        run: echo "Skipping ${{ matrix.service }}" && exit 0
+
+      - uses: actions/checkout@v4
+        if: matrix.enabled == 'true'
+
+      - name: Configure AWS credentials
+        if: matrix.enabled == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        if: matrix.enabled == 'true'
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push
+        if: matrix.enabled == 'true'
+        env:
+          ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+        run: |
+          IMAGE=$ECR_REGISTRY/${{ matrix.service }}
+          TAG=${GITHUB_SHA::7}
+          docker build -t $IMAGE:$TAG -t $IMAGE:latest ${{ matrix.context }}
+          docker push $IMAGE:$TAG
+          docker push $IMAGE:latest
+
+      - name: Deploy to EKS
+        if: matrix.enabled == 'true'
+        env:
+          ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
+          kubectl set image deployment/${{ matrix.service }} \
+            ${{ matrix.service }}=$ECR_REGISTRY/${{ matrix.service }}:${GITHUB_SHA::7} \
+            --namespace default
+          kubectl rollout status deployment/${{ matrix.service }} --namespace default --timeout=120s

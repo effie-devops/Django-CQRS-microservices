@@ -91,3 +91,8 @@ output "secrets_access_role_arn" {
 output "db_credentials_secret_arn" {
   value = aws_secretsmanager_secret.db_credentials.arn
 }
+
+# github actions
+output "github_actions_role_arn" {
+  value = aws_iam_role.github_actions_role.arn
+}
