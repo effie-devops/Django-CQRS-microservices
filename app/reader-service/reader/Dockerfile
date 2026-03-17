@@ -28,10 +28,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
-# Copy project files
-COPY . .
+# Copy shared and service files
+COPY shared/ ./shared/
+COPY reader-service/reader/ .
 
-# Give django.sh execute permissions and change ownership
+# Give django.sh execute permissions
 RUN chmod +x /app/django.sh
 
 # Expose port 8000
