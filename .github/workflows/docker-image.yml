@@ -56,9 +56,9 @@ jobs:
               git diff-tree --no-commit-id --name-only -r HEAD > changes.txt
             fi
             SERVICES="[]"
-            grep -q 'app/reader-service/' changes.txt && SERVICES=$(echo $SERVICES | jq '. + ["reader-service"]')
-            grep -q 'app/writer-service/' changes.txt && SERVICES=$(echo $SERVICES | jq '. + ["writer-service"]')
-            grep -q 'frontend/' changes.txt && SERVICES=$(echo $SERVICES | jq '. + ["frontend"]')
+            grep -q 'app/reader-service/' changes.txt && SERVICES=$(echo $SERVICES | jq -c '. + ["reader-service"]')
+            grep -q 'app/writer-service/' changes.txt && SERVICES=$(echo $SERVICES | jq -c '. + ["writer-service"]')
+            grep -q 'frontend/' changes.txt && SERVICES=$(echo $SERVICES | jq -c '. + ["frontend"]')
             echo "services=$SERVICES" >> $GITHUB_OUTPUT
           fi
 

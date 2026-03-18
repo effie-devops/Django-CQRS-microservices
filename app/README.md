@@ -22,3 +22,5 @@ app/
 - **Reader**: http://api.effiecancode.buzz
 - **Writer**: http://api.effiecancode.buzz
 - **Health**: `/health/` on both services
+
+trigger workflow
