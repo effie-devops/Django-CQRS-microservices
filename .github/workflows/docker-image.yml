@@ -6,6 +6,7 @@ on:
     paths:
       - "app/reader-service/**"
       - "app/writer-service/**"
+      - "frontend/**"
   workflow_dispatch:
     inputs:
       service:
@@ -15,7 +16,9 @@ on:
         options:
           - reader-service
           - writer-service
+          - frontend
           - both
+          - all
 
 env:
   AWS_REGION: us-east-1
@@ -31,6 +34,7 @@ jobs:
     outputs:
       reader: ${{ steps.changes.outputs.reader }}
       writer: ${{ steps.changes.outputs.writer }}
+      frontend: ${{ steps.changes.outputs.frontend }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,9 +45,11 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             case "${{ inputs.service }}" in
-              reader-service) echo "reader=true" >> $GITHUB_OUTPUT; echo "writer=false" >> $GITHUB_OUTPUT ;;
-              writer-service) echo "reader=false" >> $GITHUB_OUTPUT; echo "writer=true" >> $GITHUB_OUTPUT ;;
-              both)           echo "reader=true" >> $GITHUB_OUTPUT; echo "writer=true" >> $GITHUB_OUTPUT ;;
+              reader-service) echo "reader=true" >> $GITHUB_OUTPUT; echo "writer=false" >> $GITHUB_OUTPUT; echo "frontend=false" >> $GITHUB_OUTPUT ;;
+              writer-service) echo "reader=false" >> $GITHUB_OUTPUT; echo "writer=true" >> $GITHUB_OUTPUT; echo "frontend=false" >> $GITHUB_OUTPUT ;;
+              frontend)       echo "reader=false" >> $GITHUB_OUTPUT; echo "writer=false" >> $GITHUB_OUTPUT; echo "frontend=true" >> $GITHUB_OUTPUT ;;
+              both)           echo "reader=true" >> $GITHUB_OUTPUT; echo "writer=true" >> $GITHUB_OUTPUT; echo "frontend=false" >> $GITHUB_OUTPUT ;;
+              all)            echo "reader=true" >> $GITHUB_OUTPUT; echo "writer=true" >> $GITHUB_OUTPUT; echo "frontend=true" >> $GITHUB_OUTPUT ;;
             esac
           else
             if git rev-parse HEAD~1 >/dev/null 2>&1; then
@@ -53,6 +59,7 @@ jobs:
             fi
             echo "reader=$(grep -q 'app/reader-service/' changes.txt && echo true || echo false)" >> $GITHUB_OUTPUT
             echo "writer=$(grep -q 'app/writer-service/' changes.txt && echo true || echo false)" >> $GITHUB_OUTPUT
+            echo "frontend=$(grep -q 'frontend/' changes.txt && echo true || echo false)" >> $GITHUB_OUTPUT
           fi
 
   build-and-deploy:
@@ -69,7 +76,12 @@ jobs:
             context: app
             dockerfile: app/writer-service/writer/Dockerfile
             enabled: ${{ needs.detect-changes.outputs.writer }}
-    if: needs.detect-changes.outputs.reader == 'true' || needs.detect-changes.outputs.writer == 'true'
+          - service: frontend
+            context: frontend
+            dockerfile: frontend/Dockerfile
+            ecr_name: frontend-django
+            enabled: ${{ needs.detect-changes.outputs.frontend }}
+    if: needs.detect-changes.outputs.reader == 'true' || needs.detect-changes.outputs.writer == 'true' || needs.detect-changes.outputs.frontend == 'true'
     steps:
       - name: Skip if not changed
         if: matrix.enabled != 'true'
@@ -94,7 +106,8 @@ jobs:
         env:
           ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
         run: |
-          IMAGE=$ECR_REGISTRY/${{ matrix.service }}
+          ECR_NAME=${{ matrix.ecr_name || matrix.service }}
+          IMAGE=$ECR_REGISTRY/$ECR_NAME
           TAG=${GITHUB_SHA::7}
           docker build -f ${{ matrix.dockerfile }} -t $IMAGE:$TAG -t $IMAGE:latest ${{ matrix.context }}
           docker push $IMAGE:$TAG
@@ -105,8 +118,9 @@ jobs:
         env:
           ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
         run: |
+          ECR_NAME=${{ matrix.ecr_name || matrix.service }}
           aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
           kubectl set image deployment/${{ matrix.service }} \
-            ${{ matrix.service }}=$ECR_REGISTRY/${{ matrix.service }}:${GITHUB_SHA::7} \
+            ${{ matrix.service }}=$ECR_REGISTRY/$ECR_NAME:${GITHUB_SHA::7} \
             --namespace default
           kubectl rollout status deployment/${{ matrix.service }} --namespace default --timeout=120s

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Library — Django CQRS</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header>
+    <h1>📚 Library</h1>
+    <p>Django CQRS Microservices</p>
+  </header>
+
+  <main>
+    <section id="form-section">
+      <h2 id="form-title">Add a Book</h2>
+      <form id="book-form">
+        <input type="hidden" id="book-id">
+        <input type="text" id="title" placeholder="Title" required>
+        <input type="text" id="author" placeholder="Author" required>
+        <div class="form-actions">
+          <button type="submit" id="submit-btn">Add Book</button>
+          <button type="button" id="cancel-btn" class="secondary" hidden>Cancel</button>
+        </div>
+      </form>
+      <div id="message" hidden></div>
+    </section>
+
+    <section id="books-section">
+      <h2>Books</h2>
+      <div id="loading">Loading books...</div>
+      <div id="books-list"></div>
+      <div id="empty" hidden>No books yet. Add one above!</div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>

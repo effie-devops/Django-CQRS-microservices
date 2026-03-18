@@ -189,7 +189,8 @@ resource "aws_iam_role_policy" "github_actions_policy" {
         ]
         Resource = [
           aws_ecr_repository.ecr_repository_reader.arn,
-          aws_ecr_repository.ecr_repository_writer.arn
+          aws_ecr_repository.ecr_repository_writer.arn,
+          aws_ecr_repository.ecr_repository_frontend.arn
         ]
       },
       {
