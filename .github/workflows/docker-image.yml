@@ -32,9 +32,7 @@ jobs:
   detect-changes:
     runs-on: ubuntu-latest
     outputs:
-      reader: ${{ steps.changes.outputs.reader }}
-      writer: ${{ steps.changes.outputs.writer }}
-      frontend: ${{ steps.changes.outputs.frontend }}
+      services: ${{ steps.changes.outputs.services }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,11 +43,11 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             case "${{ inputs.service }}" in
-              reader-service) echo "reader=true" >> $GITHUB_OUTPUT; echo "writer=false" >> $GITHUB_OUTPUT; echo "frontend=false" >> $GITHUB_OUTPUT ;;
-              writer-service) echo "reader=false" >> $GITHUB_OUTPUT; echo "writer=true" >> $GITHUB_OUTPUT; echo "frontend=false" >> $GITHUB_OUTPUT ;;
-              frontend)       echo "reader=false" >> $GITHUB_OUTPUT; echo "writer=false" >> $GITHUB_OUTPUT; echo "frontend=true" >> $GITHUB_OUTPUT ;;
-              both)           echo "reader=true" >> $GITHUB_OUTPUT; echo "writer=true" >> $GITHUB_OUTPUT; echo "frontend=false" >> $GITHUB_OUTPUT ;;
-              all)            echo "reader=true" >> $GITHUB_OUTPUT; echo "writer=true" >> $GITHUB_OUTPUT; echo "frontend=true" >> $GITHUB_OUTPUT ;;
+              reader-service) echo 'services=["reader-service"]' >> $GITHUB_OUTPUT ;;
+              writer-service) echo 'services=["writer-service"]' >> $GITHUB_OUTPUT ;;
+              frontend)       echo 'services=["frontend"]' >> $GITHUB_OUTPUT ;;
+              both)           echo 'services=["reader-service","writer-service"]' >> $GITHUB_OUTPUT ;;
+              all)            echo 'services=["reader-service","writer-service","frontend"]' >> $GITHUB_OUTPUT ;;
             esac
           else
             if git rev-parse HEAD~1 >/dev/null 2>&1; then
@@ -57,70 +55,69 @@ jobs:
             else
               git diff-tree --no-commit-id --name-only -r HEAD > changes.txt
             fi
-            echo "reader=$(grep -q 'app/reader-service/' changes.txt && echo true || echo false)" >> $GITHUB_OUTPUT
-            echo "writer=$(grep -q 'app/writer-service/' changes.txt && echo true || echo false)" >> $GITHUB_OUTPUT
-            echo "frontend=$(grep -q 'frontend/' changes.txt && echo true || echo false)" >> $GITHUB_OUTPUT
+            SERVICES="[]"
+            grep -q 'app/reader-service/' changes.txt && SERVICES=$(echo $SERVICES | jq '. + ["reader-service"]')
+            grep -q 'app/writer-service/' changes.txt && SERVICES=$(echo $SERVICES | jq '. + ["writer-service"]')
+            grep -q 'frontend/' changes.txt && SERVICES=$(echo $SERVICES | jq '. + ["frontend"]')
+            echo "services=$SERVICES" >> $GITHUB_OUTPUT
           fi
 
   build-and-deploy:
     needs: detect-changes
+    if: needs.detect-changes.outputs.services != '[]'
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        include:
-          - service: reader-service
-            context: app
-            dockerfile: app/reader-service/reader/Dockerfile
-            enabled: ${{ needs.detect-changes.outputs.reader }}
-          - service: writer-service
-            context: app
-            dockerfile: app/writer-service/writer/Dockerfile
-            enabled: ${{ needs.detect-changes.outputs.writer }}
-          - service: frontend
-            context: frontend
-            dockerfile: frontend/Dockerfile
-            ecr_name: frontend-django
-            enabled: ${{ needs.detect-changes.outputs.frontend }}
-    if: needs.detect-changes.outputs.reader == 'true' || needs.detect-changes.outputs.writer == 'true' || needs.detect-changes.outputs.frontend == 'true'
+        service: ${{ fromJson(needs.detect-changes.outputs.services) }}
     steps:
-      - name: Skip if not changed
-        if: matrix.enabled != 'true'
-        run: echo "Skipping ${{ matrix.service }}" && exit 0
-
       - uses: actions/checkout@v4
-        if: matrix.enabled == 'true'
+
+      - name: Set service config
+        id: config
+        run: |
+          case "${{ matrix.service }}" in
+            reader-service)
+              echo "context=app" >> $GITHUB_OUTPUT
+              echo "dockerfile=app/reader-service/reader/Dockerfile" >> $GITHUB_OUTPUT
+              echo "ecr_name=reader-service" >> $GITHUB_OUTPUT
+              ;;
+            writer-service)
+              echo "context=app" >> $GITHUB_OUTPUT
+              echo "dockerfile=app/writer-service/writer/Dockerfile" >> $GITHUB_OUTPUT
+              echo "ecr_name=writer-service" >> $GITHUB_OUTPUT
+              ;;
+            frontend)
+              echo "context=frontend" >> $GITHUB_OUTPUT
+              echo "dockerfile=frontend/Dockerfile" >> $GITHUB_OUTPUT
+              echo "ecr_name=frontend-django" >> $GITHUB_OUTPUT
+              ;;
+          esac
 
       - name: Configure AWS credentials
-        if: matrix.enabled == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to ECR
-        if: matrix.enabled == 'true'
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push
-        if: matrix.enabled == 'true'
         env:
           ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
         run: |
-          ECR_NAME=${{ matrix.ecr_name || matrix.service }}
-          IMAGE=$ECR_REGISTRY/$ECR_NAME
+          IMAGE=$ECR_REGISTRY/${{ steps.config.outputs.ecr_name }}
           TAG=${GITHUB_SHA::7}
-          docker build -f ${{ matrix.dockerfile }} -t $IMAGE:$TAG -t $IMAGE:latest ${{ matrix.context }}
+          docker build -f ${{ steps.config.outputs.dockerfile }} -t $IMAGE:$TAG -t $IMAGE:latest ${{ steps.config.outputs.context }}
           docker push $IMAGE:$TAG
           docker push $IMAGE:latest
 
       - name: Deploy to EKS
-        if: matrix.enabled == 'true'
         env:
           ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com
         run: |
-          ECR_NAME=${{ matrix.ecr_name || matrix.service }}
           aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
           kubectl set image deployment/${{ matrix.service }} \
-            ${{ matrix.service }}=$ECR_REGISTRY/$ECR_NAME:${GITHUB_SHA::7} \
+            ${{ matrix.service }}=$ECR_REGISTRY/${{ steps.config.outputs.ecr_name }}:${GITHUB_SHA::7} \
             --namespace default
           kubectl rollout status deployment/${{ matrix.service }} --namespace default --timeout=120s

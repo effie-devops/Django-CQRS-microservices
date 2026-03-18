@@ -38,6 +38,9 @@ spec:
                 name: reader-service
                 port:
                   number: 80
+    - host: books.effiecancode.buzz
+      http:
+        paths:
           - path: /
             pathType: Prefix
             backend:

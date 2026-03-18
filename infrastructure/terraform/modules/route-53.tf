@@ -19,3 +19,16 @@ resource "aws_route53_record" "site_domain" {
     evaluate_target_health = true
   }
 }
+
+# frontend record - books.effiecancode.buzz
+resource "aws_route53_record" "frontend_domain" {
+  zone_id = aws_route53_zone.hosted_zone.zone_id
+  name    = var.frontend_record_name
+  type    = "A"
+
+  alias {
+    name                   = aws_lb.application_load_balancer.dns_name
+    zone_id                = aws_lb.application_load_balancer.zone_id
+    evaluate_target_health = true
+  }
+}

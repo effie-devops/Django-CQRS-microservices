@@ -45,7 +45,8 @@ module "django_infrastructure" {
   github_repo = var.github_repo
 
   # Route53
-  record_name = var.record_name
+  record_name          = var.record_name
+  frontend_record_name = var.frontend_record_name
 
   # CloudFront
   enable_cloudfront = var.enable_cloudfront

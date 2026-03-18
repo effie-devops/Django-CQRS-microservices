@@ -154,6 +154,11 @@ variable "record_name" {
   type        = string
 }
 
+variable "frontend_record_name" {
+  description = "frontend sub domain name"
+  type        = string
+}
+
 # cloudfront variables
 variable "enable_cloudfront" {
   description = "enable cloudfront distribution"
