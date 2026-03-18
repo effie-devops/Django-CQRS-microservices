@@ -6,7 +6,7 @@ class Library(models.Model):
     description = models.TextField()
 
     class Meta:
-        db_table = 'library'
+        db_table = 'writer_library'
 
     def __str__(self):
         return self.title
