@@ -96,3 +96,20 @@ output "db_credentials_secret_arn" {
 output "github_actions_role_arn" {
   value = aws_iam_role.github_actions_role.arn
 }
+
+# karpenter
+output "karpenter_controller_role_arn" {
+  value = aws_iam_role.karpenter_controller_role.arn
+}
+
+output "karpenter_node_role_arn" {
+  value = aws_iam_role.karpenter_node_role.arn
+}
+
+output "karpenter_instance_profile_name" {
+  value = aws_iam_instance_profile.karpenter_node.name
+}
+
+output "karpenter_interruption_queue_name" {
+  value = aws_sqs_queue.karpenter_interruption.name
+}

@@ -22,7 +22,8 @@ resource "aws_eks_cluster" "eks_cluster" {
   ]
 
   tags = {
-    Name = "${var.project_name}-${var.environment}-eks-cluster"
+    Name                     = "${var.project_name}-${var.environment}-eks-cluster"
+    "karpenter.sh/discovery" = "${var.project_name}-${var.environment}-cluster"
   }
 }
 

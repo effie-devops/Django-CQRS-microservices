@@ -1,0 +1,211 @@
+@startuml Django CQRS Microservices Architecture
+
+' ── Layout & Styling ──
+top to bottom direction
+skinparam linetype ortho
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontSize 11
+skinparam defaultFontName "Segoe UI"
+skinparam shadowing false
+skinparam roundCorner 12
+skinparam padding 6
+
+' ── Faded pastel palette ──
+skinparam rectangle {
+  BorderColor #CCCCCC
+  FontColor #333333
+}
+skinparam component {
+  BorderColor #BBBBBB
+  FontColor #333333
+}
+skinparam database {
+  BorderColor #BBBBBB
+  FontColor #333333
+}
+skinparam arrow {
+  Color #888888
+  FontColor #666666
+  FontSize 10
+}
+skinparam actor {
+  BorderColor #AAAAAA
+}
+
+title <size:16><b>Django CQRS Microservices</b> — Architecture Overview</size>
+
+' ══════════════════════════════════════
+' ACTORS
+' ══════════════════════════════════════
+actor "User" as user #E8F0FE
+actor "Developer" as dev #FFF3E0
+
+' ══════════════════════════════════════
+' DNS & EDGE
+' ══════════════════════════════════════
+rectangle "DNS & Edge Layer" as edge #F3E8FD {
+  component "Route 53\napis.effiecancode.buzz\nbooks.effiecancode.buzz" as r53 #EDE4F7
+  component "CloudFront\nDistribution" as cf #EDE4F7
+  component "WAF\nWeb ACL" as waf #EDE4F7
+  component "ACM\nTLS Certificate" as acm #EDE4F7
+}
+
+' ══════════════════════════════════════
+' CI/CD
+' ══════════════════════════════════════
+rectangle "CI/CD Pipeline" as cicd #FFF3E0 {
+  component "GitHub Actions\n(OIDC Auth)" as gha #FFECD2
+  component "Amazon ECR\nreader-service\nwriter-service\nfrontend-django" as ecr #FFECD2
+}
+
+' ══════════════════════════════════════
+' EKS CLUSTER
+' ══════════════════════════════════════
+rectangle "Amazon EKS Cluster  (django-api-uat-cluster)" as eks #E8F5E9 {
+
+  component "ALB Ingress Controller\n(internet-facing, HTTPS:443)" as alb #D7ECD9
+
+  rectangle "Karpenter" as karp #D7ECD9 {
+    component "NodePool + EC2NodeClass" as karpcomp #C8E6C9
+  }
+
+  rectangle "Reader Service" as rsvc #DCEDC8 {
+    component "Deployment\n2–6 replicas (HPA)" as rdeploy #E8F5E9
+    component "ClusterIP :80 → :8000" as rservice #E8F5E9
+    component "ConfigMap" as rcm #E8F5E9
+    component "SecretProviderClass\n(CSI → reader-service-db-secret)" as rspc #E8F5E9
+    component "ServiceAccount (IRSA)" as rsa #E8F5E9
+  }
+
+  rectangle "Writer Service" as wsvc #DCEDC8 {
+    component "Deployment\n2–6 replicas (HPA)" as wdeploy #E8F5E9
+    component "ClusterIP :80 → :8000" as wservice #E8F5E9
+    component "ConfigMap" as wcm #E8F5E9
+    component "SecretProviderClass\n(CSI → writer-service-db-secret)" as wspc #E8F5E9
+    component "ServiceAccount (IRSA)" as wsa #E8F5E9
+  }
+
+  rectangle "Frontend" as fsvc #DCEDC8 {
+    component "Deployment\n(Nginx + static)" as fdeploy #E8F5E9
+    component "ClusterIP :80" as fservice #E8F5E9
+  }
+}
+
+' ══════════════════════════════════════
+' DATA & SECRETS
+' ══════════════════════════════════════
+rectangle "Data Layer" as data #E3F2FD {
+  component "AWS Secrets Manager\ndjango-api/uat/db-credentials" as sm #DCEEFB
+  database "Amazon RDS\nPostgreSQL" as rds #DCEEFB
+}
+
+' ══════════════════════════════════════
+' IAM
+' ══════════════════════════════════════
+rectangle "IAM Roles" as iam #FFF8E1 {
+  component "GitHub Actions OIDC Role\ndjango-api-uat-github-actions-role" as ghrole #FFF0C2
+  component "Secrets IRSA Role\ndjango-api-uat-secrets-access-role" as secretsrole #FFF0C2
+  component "ALB Controller Role" as albrole #FFF0C2
+  component "Karpenter Controller Role" as karprole #FFF0C2
+}
+
+' ══════════════════════════════════════
+' NETWORKING
+' ══════════════════════════════════════
+rectangle "Networking (Terraform)" as net #FCE4EC {
+  component "VPC\nPublic + Private Subnets" as vpc #F8D7DA
+  component "NAT Gateway" as nat #F8D7DA
+  component "Security Groups\nApp SG + EKS Cluster SG → RDS SG" as sg #F8D7DA
+}
+
+' ══════════════════════════════════════
+' OBSERVABILITY
+' ══════════════════════════════════════
+rectangle "Observability" as obs #E0F7FA {
+  component "CloudWatch\nLogs & Metrics" as cw #D4F0F5
+  component "CloudTrail" as ct #D4F0F5
+  component "VPC Flow Logs\n(S3 Bucket)" as flowlogs #D4F0F5
+}
+
+' ══════════════════════════════════════
+' RELATIONSHIPS
+' ══════════════════════════════════════
+
+' ── User traffic ──
+user -[#7986CB]-> r53
+r53 -[#7986CB]-> cf : books.*
+r53 -[#7986CB]-> alb : apis.*
+cf -[#7986CB]-> waf
+waf -[#7986CB]-> alb
+acm -[#7986CB]-> alb : TLS
+
+' ── ALB routing ──
+alb -[#66BB6A]-> rservice : /reader/*  /health
+alb -[#66BB6A]-> wservice : /writer/*
+alb -[#66BB6A]-> fservice : / (books.*)
+
+' ── Service internals ──
+rservice -[#A5D6A7]-> rdeploy
+rdeploy -[#A5D6A7]-> rcm
+rdeploy -[#A5D6A7]-> rspc
+rdeploy -[#A5D6A7]-> rsa
+
+wservice -[#A5D6A7]-> wdeploy
+wdeploy -[#A5D6A7]-> wcm
+wdeploy -[#A5D6A7]-> wspc
+wdeploy -[#A5D6A7]-> wsa
+
+fservice -[#A5D6A7]-> fdeploy
+
+' ── Secrets flow ──
+rspc -[#FFA726]-> sm : CSI fetch
+wspc -[#FFA726]-> sm : CSI fetch
+sm -[#FFA726]-> rds : DB credentials
+
+' ── DB access (CQRS) ──
+rdeploy -[#42A5F5]-> rds : READ (GET)
+wdeploy -[#EF5350]-> rds : WRITE (POST/PUT/DELETE)
+
+' ── IAM bindings ──
+rsa -[#FFD54F]-> secretsrole
+wsa -[#FFD54F]-> secretsrole
+gha -[#FFD54F]-> ghrole : OIDC
+albrole -[#FFD54F]-> alb
+karprole -[#FFD54F]-> karpcomp
+
+' ── CI/CD flow ──
+dev -[#FF8A65]-> gha : push main /\nmanual dispatch
+gha -[#FF8A65]-> ecr : docker build+push\n(SHA + latest)
+gha -[#FF8A65]-> eks : kubectl set image
+
+' ── Networking ──
+eks -[#E57373]-> vpc
+rds -[#E57373]-> vpc
+nat -[#E57373]-> vpc
+sg -[#E57373]-> rds : inbound
+
+' ── Observability ──
+eks -[#4DD0E1]-> cw
+vpc -[#4DD0E1]-> flowlogs
+ct -[#4DD0E1]-> cw
+
+' ══════════════════════════════════════
+' LEGEND
+' ══════════════════════════════════════
+legend bottom right
+  |<#E8F5E9>  | EKS / Kubernetes |
+  |<#E3F2FD>  | Data Layer |
+  |<#F3E8FD>  | DNS & Edge |
+  |<#FFF3E0>  | CI/CD |
+  |<#FFF8E1>  | IAM |
+  |<#FCE4EC>  | Networking |
+  |<#E0F7FA>  | Observability |
+  |= Line Color =| Meaning |
+  |<#42A5F5>  | READ path |
+  |<#EF5350>  | WRITE path |
+  |<#FFA726>  | Secrets flow |
+  |<#FF8A65>  | CI/CD flow |
+  |<#7986CB>  | User traffic |
+endlegend
+
+@enduml

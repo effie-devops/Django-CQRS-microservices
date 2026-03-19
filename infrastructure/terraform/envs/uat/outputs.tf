@@ -73,3 +73,13 @@ output "vpc_flow_log_id" {
   description = "VPC Flow Log ID"
   value       = module.django_infrastructure.vpc_flow_log_id
 }
+
+output "karpenter_controller_role_arn" {
+  description = "IAM role ARN for Karpenter controller"
+  value       = module.django_infrastructure.karpenter_controller_role_arn
+}
+
+output "karpenter_interruption_queue_name" {
+  description = "SQS queue name for Karpenter spot interruption"
+  value       = module.django_infrastructure.karpenter_interruption_queue_name
+}

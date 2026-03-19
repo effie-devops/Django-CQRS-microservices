@@ -86,6 +86,7 @@ resource "aws_subnet" "private_app_subnet_az1" {
     Name                                                              = "${var.project_name}-${var.environment}-private-app-az1"
     "kubernetes.io/role/internal-elb"                                  = "1"
     "kubernetes.io/cluster/${var.project_name}-${var.environment}-cluster" = "shared"
+    "karpenter.sh/discovery"                                          = "${var.project_name}-${var.environment}-cluster"
   }
 }
 
@@ -100,6 +101,7 @@ resource "aws_subnet" "private_app_subnet_az2" {
     Name                                                              = "${var.project_name}-${var.environment}-private-app-az2"
     "kubernetes.io/role/internal-elb"                                  = "1"
     "kubernetes.io/cluster/${var.project_name}-${var.environment}-cluster" = "shared"
+    "karpenter.sh/discovery"                                          = "${var.project_name}-${var.environment}-cluster"
   }
 }
 
