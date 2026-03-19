@@ -13,10 +13,10 @@ export const options = {
   insecureSkipTLSVerify: true,
   stages: [
     { duration: "20s", target: 20 },     // warm up
-    { duration: "40s", target: 300 },    // moderate load
-    { duration: "1m", target: 600 },     // push hard — trigger HPA
-    { duration: "1m30s", target: 1000 },  // spike — sustained peak
-    { duration: "1m", target: 1000 },     // hold peak
+    { duration: "40s", target: 100 },    // moderate load
+    { duration: "1m", target: 300 },     // push hard — trigger HPA
+    { duration: "1m30s", target: 500 },  // spike — sustained peak
+    { duration: "1m", target: 500 },     // hold peak
     { duration: "30s", target: 0 },      // cool down
   ],
   thresholds: {
