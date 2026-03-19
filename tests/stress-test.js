@@ -12,12 +12,12 @@ const writerLatency = new Trend("writer_latency", true);
 export const options = {
   insecureSkipTLSVerify: true,
   stages: [
-    { duration: "30s", target: 20 },    // warm up
-    { duration: "1m", target: 80 },      // moderate load
-    { duration: "2m", target: 200 },     // push hard — trigger HPA
-    { duration: "2m", target: 400 },     // spike — trigger Karpenter
-    { duration: "2m", target: 400 },     // sustained peak
-    { duration: "1m", target: 0 },       // cool down
+    { duration: "20s", target: 20 },     // warm up
+    { duration: "40s", target: 100 },    // moderate load
+    { duration: "1m", target: 300 },     // push hard — trigger HPA
+    { duration: "1m30s", target: 400 },  // spike — sustained peak
+    { duration: "1m", target: 400 },     // hold peak
+    { duration: "30s", target: 0 },      // cool down
   ],
   thresholds: {
     http_req_duration: ["p(95)<3000"],

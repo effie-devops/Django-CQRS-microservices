@@ -54,12 +54,12 @@ bash tests/monitor.sh
 
 | Time | VUs | What to Say |
 |------|-----|-------------|
-| 0:00–0:30 | 0→20 | _"Warm-up phase. 60% reads, 25% writes, 15% health checks."_ |
-| 0:30–1:30 | 20→80 | _"Moderate load. Watch the CPU start climbing in the monitor."_ |
-| 1:30–3:30 | 80→200 | _"This is where it gets interesting. CPU should cross 70% — watch for HPA scaling."_ |
-| 3:30–5:30 | 200→400 | _"Heavy spike. If HPA maxes out at 6 pods and nodes are full, Karpenter provisions a new node."_ |
-| 5:30–7:30 | 400 | _"Sustained peak. The system should be fully scaled out now."_ |
-| 7:30–8:30 | 400→0 | _"Cool-down. After traffic drops, watch HPA scale back down and Karpenter consolidate nodes."_ |
+| 0:00–0:20 | 0→20 | _"Warm-up phase. 60% reads, 25% writes, 15% health checks."_ |
+| 0:20–1:00 | 20→100 | _"Moderate load. Watch the CPU start climbing in the monitor."_ |
+| 1:00–2:00 | 100→300 | _"This is where it gets interesting. CPU should cross 70% — watch for HPA scaling."_ |
+| 2:00–3:30 | 300→400 | _"Heavy spike. HPA should be scaling pods to max now."_ |
+| 3:30–4:30 | 400 | _"Sustained peak. The system is fully scaled out."_ |
+| 4:30–5:00 | 400→0 | _"Cool-down. After traffic drops, watch HPA scale back down."_ |
 
 ---
 
